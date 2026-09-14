@@ -112,6 +112,22 @@
     padding:12px 14px;border-radius:10px;font-size:12.5px;margin-bottom:16px;line-height:1.5;
   }
   .top-link{background:none;border:none;color:var(--gris);font-size:12.5px;font-weight:600;cursor:pointer;padding:0 0 14px;text-decoration:underline;}
+
+  /* Folio / número de reporte */
+  .folio-box{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    background:var(--verde-claro);border:1.5px dashed var(--verde-lipu);
+    border-radius:12px;padding:12px 14px;margin-bottom:16px;
+  }
+  .folio-box .lbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--gris);}
+  .folio-box .val{font-size:20px;font-weight:800;color:var(--verde-oscuro);letter-spacing:.02em;font-variant-numeric:tabular-nums;}
+  .folio-box button{
+    background:#fff;border:1.5px solid var(--verde-lipu);color:var(--verde-oscuro);
+    border-radius:9px;padding:8px 14px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;
+  }
+  .folio-box button:hover{background:#fff;border-color:var(--verde-oscuro);}
+  .rec-info .folio{display:inline-block;background:var(--verde-claro);color:var(--verde-oscuro);
+    font-weight:800;font-size:11.5px;border-radius:6px;padding:2px 7px;margin-right:6px;letter-spacing:.02em;}
 </style>
 </head>
 <body>
@@ -142,6 +158,14 @@
     <button class="top-link" id="btnVolverLista" style="display:none;" onclick="volverALista()">← Volver a la lista</button>
 
     <div id="msgArea"></div>
+
+    <div class="folio-box" id="folioBox">
+      <div>
+        <div class="lbl">No. de reporte</div>
+        <div class="val" id="folioTexto">—</div>
+      </div>
+      <button type="button" id="btnCopiarFolio" onclick="copiarFolio()">Copiar</button>
+    </div>
 
     <form id="taxiForm" onsubmit="return false;">
       <div class="field">
@@ -271,6 +295,8 @@ let filaEditando = null;   // número de fila real en la hoja
 let marcaTemporalOriginal = null;
 let registrosCache = [];
 let autenticado = false;
+let folioActual = '';
+const CAMPO_FOLIO = 'No. de reporte';   // debe coincidir con el encabezado en la hoja
 
 /* ============ INIT ============ */
 function poblarSelect(id, opciones){
@@ -291,6 +317,43 @@ if (!CONFIG.API_URL || CONFIG.API_URL.includes('PEGA_AQUI')){
 
 // Vista inicial: contestar
 mostrarVistaFormulario('create');
+
+/* ============ FOLIO / NUMERO DE REPORTE ============ */
+// Respaldo: el folio oficial lo genera el Apps Script (consecutivo RT-000123).
+// Esta función solo se usa si el servidor no devolviera folio.
+function generarFolio(){
+  const d = new Date();
+  const pad = n=>String(n).padStart(2,'0');
+  const fecha = d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate());
+  const hora  = pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds());
+  const rnd   = String(Math.floor(Math.random()*900)+100);
+  return 'RT-'+fecha+'-'+hora+'-'+rnd;
+}
+
+function mostrarFolio(valor, pendiente){
+  folioActual = valor || '';
+  const box = document.getElementById('folioBox');
+  document.getElementById('folioTexto').textContent =
+    folioActual || 'Se asignará al enviar';
+  document.getElementById('folioTexto').style.opacity = folioActual ? '1' : '.55';
+  document.getElementById('btnCopiarFolio').style.display = folioActual ? 'inline-block' : 'none';
+  box.style.display = 'flex';
+  box.style.borderStyle = folioActual ? 'solid' : 'dashed';
+}
+
+function copiarFolio(){
+  if (!folioActual) return;
+  const btn = document.getElementById('btnCopiarFolio');
+  const ok = ()=>{ btn.textContent='¡Copiado!'; setTimeout(()=>btn.textContent='Copiar',1500); };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(folioActual).then(ok).catch(()=>{});
+  } else {
+    const ta=document.createElement('textarea');
+    ta.value=folioActual; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); ok(); }catch(e){}
+    document.body.removeChild(ta);
+  }
+}
 
 /* ============ TABS ============ */
 function cambiarTab(tab){
@@ -325,6 +388,7 @@ function mostrarVistaFormulario(m){
     document.getElementById('taxiForm').reset();
     filaEditando = null;
     marcaTemporalOriginal = null;
+    mostrarFolio('', true);   // el servidor asigna el folio consecutivo al guardar
   }
 }
 
@@ -375,6 +439,7 @@ function renderLista(regs){
     div.className = 'rec';
     div.innerHTML = `
       <div class="rec-info">
+        ${r[CAMPO_FOLIO] ? '<span class="folio">'+escapeHtml(r[CAMPO_FOLIO])+'</span>' : ''}
         <b>${escapeHtml(r['PLANTA']||'—')}</b> · ${escapeHtml(r['Tipo de solicitud']||'—')}<br>
         <span class="sub">${escapeHtml(r['Fecha de solicitud']||'—')} · Operador: ${escapeHtml(r['Operador']||'—')} · Ruta: ${escapeHtml(r['Ruta']||'—')}</span>
       </div>
@@ -409,6 +474,8 @@ function cargarParaEditar(r){
 
   filaEditando = r._row;
   marcaTemporalOriginal = r['Marca temporal'];
+  // Conserva el folio original; si el registro es anterior a esta función, se le asigna uno.
+  mostrarFolio(r[CAMPO_FOLIO] || '', !r[CAMPO_FOLIO]);
 
   document.getElementById('vistaLista').style.display='none';
   mostrarVistaFormulario('update');
@@ -433,7 +500,9 @@ function escapeHtml(s){
 
 /* ============ VALIDACIÓN Y ENVÍO ============ */
 function leerFormulario(){
-  return {
+  const d = {};
+  d[CAMPO_FOLIO] = folioActual;
+  return Object.assign(d, {
     'PLANTA': document.getElementById('f_planta').value,
     'Tipo de solicitud': document.getElementById('f_tipo').value,
     'Motivo de solicitud': document.getElementById('f_motivo').value.trim(),
@@ -446,7 +515,7 @@ function leerFormulario(){
     'Usuarios': document.getElementById('f_usuarios').value.trim(),
     'Operador': document.getElementById('f_operador').value.trim(),
     'Inplant que solicita': document.getElementById('f_inplant').value
-  };
+  });
 }
 
 function validar(data){
@@ -486,11 +555,18 @@ async function enviarFormulario(){
     const result = await res.json();
     if (!result.ok) throw new Error(result.error || 'Error al guardar');
 
-    msgArea.innerHTML = '<div class="msg msg-ok">'+(modo==='create' ? 'Respuesta enviada correctamente.' : 'Cambios guardados correctamente.')+'</div>';
+    const folioGuardado = (result.folio || data[CAMPO_FOLIO]);   // si el servidor devuelve folio, gana el del servidor
+    mostrarFolio(folioGuardado, false);
+    data[CAMPO_FOLIO] = folioGuardado;
+
+    msgArea.innerHTML = '<div class="msg msg-ok">'
+      + (modo==='create' ? 'Respuesta enviada correctamente.' : 'Cambios guardados correctamente.')
+      + '<br>No. de reporte: <b>'+escapeHtml(folioGuardado)+'</b></div>';
     generarImagenComprobante(data);
 
     if (modo === 'create'){
       document.getElementById('taxiForm').reset();
+      mostrarFolio('', true);   // listo para la siguiente captura
     }
   }catch(err){
     msgArea.innerHTML = '<div class="msg msg-err">No se pudo guardar: '+err.message+'</div>';
@@ -520,6 +596,7 @@ function wrapText(ctx, text, maxWidth){
 
 function generarImagenComprobante(data){
   const etiquetas = [
+    [CAMPO_FOLIO,'No. de reporte'],
     ['PLANTA','PLANTA'],
     ['Tipo de solicitud','Tipo de solicitud'],
     ['Motivo de solicitud','Motivo de solicitud'],
@@ -584,6 +661,19 @@ function generarImagenComprobante(data){
   const fechaHora = new Date().toLocaleString('es-MX',{dateStyle:'medium',timeStyle:'short'});
   ctx.fillText('Generado: '+fechaHora, marginX, 90);
 
+  // Folio destacado a la derecha del header
+  const folioTxt = String(data[CAMPO_FOLIO]||'');
+  if (folioTxt){
+    ctx.textAlign = 'right';
+    ctx.font = '11.5px Arial';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText('NO. DE REPORTE', width-marginX, 44);
+    ctx.font = 'bold 18px Arial';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(folioTxt, width-marginX, 68);
+    ctx.textAlign = 'left';
+  }
+
   // filas
   let y = headerH;
   rows.forEach((r, i)=>{
@@ -614,7 +704,8 @@ function generarImagenComprobante(data){
   // descarga
   const link = document.createElement('a');
   const stamp = new Date().toISOString().replace(/[:.]/g,'-');
-  link.download = 'registro_taxi_'+stamp+'.png';
+  const folioArchivo = String(data[CAMPO_FOLIO]||'').replace(/[^A-Za-z0-9\-]/g,'');
+  link.download = folioArchivo ? (folioArchivo+'.png') : ('registro_taxi_'+stamp+'.png');
   link.href = canvas.toDataURL('image/png');
   document.body.appendChild(link);
   link.click();
