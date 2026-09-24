@@ -236,6 +236,13 @@
         </select>
       </div>
 
+      <div class="field">
+        <label>Gerente que autoriza <span class="req">*</span></label>
+        <select id="f_gerente" required>
+          <option value="">Selecciona…</option>
+        </select>
+      </div>
+
       <div class="btn-row">
         <button type="button" class="btn btn-primary" id="btnEnviar" onclick="enviarFormulario()">Enviar respuesta</button>
       </div>
@@ -289,6 +296,8 @@ const OPCIONES_INPLANT = [
   'Nallely Cepeda','Verlinda Gatica','Estefanía Galán'
 ];
 
+const OPCIONES_GERENTE = ['Ezequiel Pulido','Eduardo Ramos'];
+
 /* ============ ESTADO ============ */
 let modo = 'create';       // 'create' | 'update'
 let filaEditando = null;   // número de fila real en la hoja
@@ -310,6 +319,7 @@ function poblarSelect(id, opciones){
 poblarSelect('f_planta', OPCIONES_PLANTA);
 poblarSelect('f_tipo', OPCIONES_TIPO);
 poblarSelect('f_inplant', OPCIONES_INPLANT);
+poblarSelect('f_gerente', OPCIONES_GERENTE);
 
 if (!CONFIG.API_URL || CONFIG.API_URL.includes('PEGA_AQUI')){
   document.getElementById('configWarning').style.display = 'block';
@@ -471,6 +481,7 @@ function cargarParaEditar(r){
   document.getElementById('f_usuarios').value = r['Usuarios']||'';
   document.getElementById('f_operador').value = r['Operador']||'';
   document.getElementById('f_inplant').value = r['Inplant que solicita']||'';
+  document.getElementById('f_gerente').value = r['Gerente que autoriza']||'';
 
   filaEditando = r._row;
   marcaTemporalOriginal = r['Marca temporal'];
@@ -514,12 +525,13 @@ function leerFormulario(){
     'Fecha de solicitud': document.getElementById('f_fecha').value,
     'Usuarios': document.getElementById('f_usuarios').value.trim(),
     'Operador': document.getElementById('f_operador').value.trim(),
-    'Inplant que solicita': document.getElementById('f_inplant').value
+    'Inplant que solicita': document.getElementById('f_inplant').value,
+    'Gerente que autoriza': document.getElementById('f_gerente').value
   });
 }
 
 function validar(data){
-  const requeridos = ['PLANTA','Tipo de solicitud','Motivo de solicitud','Ruta','Hora de Inicio','Hora de Llegada','Fecha de solicitud','Operador','Inplant que solicita'];
+  const requeridos = ['PLANTA','Tipo de solicitud','Motivo de solicitud','Ruta','Hora de Inicio','Hora de Llegada','Fecha de solicitud','Operador','Inplant que solicita','Gerente que autoriza'];
   return requeridos.every(k => String(data[k]||'').trim() !== '');
 }
 
@@ -608,7 +620,8 @@ function generarImagenComprobante(data){
     ['Fecha de solicitud','Fecha de solicitud'],
     ['Usuarios','Usuarios'],
     ['Operador','Operador'],
-    ['Inplant que solicita','Inplant que solicita']
+    ['Inplant que solicita','Inplant que solicita'],
+    ['Gerente que autoriza','Gerente que autoriza']
   ];
 
   const width = 720;
